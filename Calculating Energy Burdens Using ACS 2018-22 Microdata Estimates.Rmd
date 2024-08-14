@@ -1,0 +1,81 @@
+---
+title: "Calculating Energy Burdens Using ACS 2018-22 Microdata Estimates"
+output: html_document
+date: "2024-08-14"
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r load packages}
+
+library(tidyverse)
+library(spatstat)
+
+```
+
+
+```{r}
+
+acs23_energy_burden <- read_csv("usa_00010.csv.gz")
+FIPS_Codes <- read_csv("FIPS Codes.csv") %>%
+  rename("STATEFIP" = "FIPS")
+
+acs23_energy_burden_sub <- acs23_energy_burden %>% 
+  filter(GQ <= 2 | GQ == 5)
+
+acs23_energy_burden_sub <- acs23_energy_burden_sub %>%
+  filter(HHINCOME != 9999999)
+
+acs23_energy_burden_sub$COSTGAS <- replace(acs23_energy_burden_sub$COSTGAS, acs23_energy_burden_sub$COSTGAS == 9992, 0)
+acs23_energy_burden_sub$COSTGAS <- replace(acs23_energy_burden_sub$COSTGAS, acs23_energy_burden_sub$COSTGAS == 9993, 0)
+acs23_energy_burden_sub$COSTGAS <- replace(acs23_energy_burden_sub$COSTGAS, acs23_energy_burden_sub$COSTGAS == 9997, 0)
+
+acs23_energy_burden_sub$COSTELEC <- replace(acs23_energy_burden_sub$COSTELEC, acs23_energy_burden_sub$COSTELEC == 9993, 0)
+acs23_energy_burden_sub$COSTELEC <- replace(acs23_energy_burden_sub$COSTELEC, acs23_energy_burden_sub$COSTELEC == 9997, 0)
+
+acs23_energy_burden_sub$COSTFUEL <- replace(acs23_energy_burden_sub$COSTFUEL, acs23_energy_burden_sub$COSTFUEL == 9993, 0)
+acs23_energy_burden_sub$COSTFUEL <- replace(acs23_energy_burden_sub$COSTFUEL, acs23_energy_burden_sub$COSTFUEL == 9997, 0)
+  
+acs23_energy_burden_sub <- acs23_energy_burden_sub %>%
+  filter(PERNUM == 1)
+
+acs23_energy_burden_sub <- acs23_energy_burden_sub %>%
+  select(HHWT, COSTELEC, COSTGAS, COSTFUEL, HHINCOME, STATEFIP)
+
+acs23_energy_burden_sub <- left_join(acs23_energy_burden_sub, FIPS_Codes)
+
+acs23_energy_burden_sub %>%
+  group_by(Abbr) %>%
+  summarize(HHINCOME_med = weighted.median(HHINCOME, w = HHWT, type = 2),
+            COSTELEC_med = weighted.median(COSTELEC, w = HHWT, type = 2),
+            COSTGAS_med = weighted.median(COSTGAS, w = HHWT, type = 2),
+            COSTFUEL_med = weighted.median(COSTFUEL, w = HHWT, type = 2)) %>%
+  mutate(energy_costs = COSTELEC_med + COSTGAS_med + COSTFUEL_med) %>%
+  mutate(energy_burden = energy_costs / HHINCOME_med)
+
+```
+
+
+```{r }
+FIPS_Codes <- FIPS_Codes 
+
+
+
+
+acs23_energy_burden_sub <- acs23_energy_burden_sub %>%
+  group_by(Abbr) %>%
+  summarize(energy_cost_avg = weighted.mean(energy_costs, w = HHWT), HHINCOME_med = weighted.median(HHINCOME, w = HHWT))
+
+acs23_energy_burden_sub
+
+acs23_energy_burden_sub %>% 
+  mutate(income_cat = case_when(HHINCOME <= Median_Income_80_perc ~ "Below 80% AMI",
+                                HHINCOME >= Median_Income_80_perc ~ "Above 80% AMI"))
+
+
+
+```

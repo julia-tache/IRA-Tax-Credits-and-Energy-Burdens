@@ -1,0 +1,5 @@
+New data on Inflation Reduction Act Energy Efficient Home Improvement Credit (25C) and Residential Clean Energy Credit (25D) uptake was released last week. 25C and 25D home energy credits can be claimed by homeowners and renters for retrofits and installations made in 2022 and beyond. 25C provides a capped 30% tax credit, which resets every year, for heat pumps, heat pump water heaters (HPWHs), electrical panel upgrades, weatherization measures, and energy audits. 25D provides an uncapped 30% tax credit for rooftop solar, battery storage, and geothermal heating.
+
+So far, many people filing taxes and claiming these credits tend to be higher income than those more likely to face high energy burdens. Energy efficiency and clean energy upgrades could greatly reduce home energy costs, and these credits have the potential to provide economically insecure households with necessary improvements to their homes.
+
+![alt text](https://github.com/julia-tache/IRA-Tax-Credits-and-Energy-Burdens/blob/main/bar_graphs.png?raw=true)

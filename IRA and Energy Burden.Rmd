@@ -38,8 +38,8 @@ ira_returns_income_cat <- data.frame(Income_Cat, Num_of_Returns_Total, Num_of_Re
 ira_returns_income_cat_graph <- melt(ira_returns_income_cat, value = c("Num_of_Returns_Total", "Num_of_Returns_clean_energy", "Num_of_Returns_home_improvement"))
 
 ira_returns_income_cat_graph$variable <- str_replace(ira_returns_income_cat_graph$variable, "Num_of_Returns_Total", "Total")
-ira_returns_income_cat_graph$variable <- str_replace(ira_returns_income_cat_graph$variable, "Num_of_Returns_clean_energy", "Residential Clean Energy Credit")
-ira_returns_income_cat_graph$variable <- str_replace(ira_returns_income_cat_graph$variable, "Num_of_Returns_home_improvement", "Energy Efficicent Home Improvement Credit")
+ira_returns_income_cat_graph$variable <- str_replace(ira_returns_income_cat_graph$variable, "Num_of_Returns_clean_energy", "Residential Clean Energy Credit (25D)")
+ira_returns_income_cat_graph$variable <- str_replace(ira_returns_income_cat_graph$variable, "Num_of_Returns_home_improvement", "Energy Efficicent Home Improvement Credit (25C)")
 
 ira_returns_income_cat_graph$labels <- paste0("$", round(ira_returns_income_cat_graph$value / 1000), "K")
 ira_returns_income_cat_graph[5, 4] <- "$1,194K"

@@ -1,0 +1,271 @@
+---
+title: "IRA and Energy Burden"
+output: html_document
+date: "2024-08-14"
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r load packages}
+
+library(tidyverse)
+library(reshape2)
+library(spatstat)
+library(scales)
+library(sf)
+library(RColorBrewer)
+library(grid)
+library(gridExtra)
+
+```
+
+```{r returns with IRA tax credit by income cat}
+
+Income_Cat <- c("Under $25,000", "$25,000 - $50,000", "$50,000 - $75,000", "$75,000 - $100,000", "$100,000 - $200,000", "$200,000 - $500,000", "$500,000 - $1,000,000", "Above $1,000,000")
+
+Num_of_Returns_Total <- c(70530, 443880, 581390, 521150, 1194450, 526980, 67580, 15930)
+
+Num_of_Returns_clean_energy <- c(31190, 217880, 256410, 199440, 368320, 145640, 21480, 6080)
+
+Num_of_Returns_home_improvement <- c(40430, 242280, 352640, 346830, 885000, 409910, 50430, 10910)
+
+ira_returns_income_cat <- data.frame(Income_Cat, Num_of_Returns_Total, Num_of_Returns_clean_energy, Num_of_Returns_home_improvement)
+
+ira_returns_income_cat_graph <- melt(ira_returns_income_cat, value = c("Num_of_Returns_Total", "Num_of_Returns_clean_energy", "Num_of_Returns_home_improvement"))
+
+ira_returns_income_cat_graph$variable <- str_replace(ira_returns_income_cat_graph$variable, "Num_of_Returns_Total", "Total")
+ira_returns_income_cat_graph$variable <- str_replace(ira_returns_income_cat_graph$variable, "Num_of_Returns_clean_energy", "Residential Clean Energy Credit")
+ira_returns_income_cat_graph$variable <- str_replace(ira_returns_income_cat_graph$variable, "Num_of_Returns_home_improvement", "Energy Efficicent Home Improvement Credit")
+
+ira_returns_income_cat_graph$labels <- paste0("$", round(ira_returns_income_cat_graph$value / 1000), "K")
+ira_returns_income_cat_graph[5, 4] <- "$1,194K"
+
+ira_returns_income_cat_graph$Income_Cat <- factor(ira_returns_income_cat_graph$Income_Cat, levels = c("Under $25,000",
+                                                          "$25,000 - $50,000",
+                                                          "$50,000 - $75,000",
+                                                          "$75,000 - $100,000",
+                                                          "$100,000 - $200,000",
+                                                          "$200,000 - $500,000",
+                                                          "$500,000 - $1,000,000",
+                                                          "Above $1,000,000"))
+
+ira_returns_income_cat_graph$value <- ira_returns_income_cat_graph$value / 1000
+
+bar_graph_1 <- ira_returns_income_cat_graph %>%
+  ggplot(aes(x = Income_Cat, y = value, fill = variable)) +
+  geom_bar(position = "dodge", stat = "identity", color = "black") +
+  geom_text(aes(label = labels, group = variable), size = 2.25, color = "black", family = "serif", fontface = "bold", show.legend = FALSE, position = position_dodge(width = 1), hjust = 0.5, vjust = -1, stat = "identity") +
+  scale_fill_manual(values = c("#fec868", "#F0F4BF", "#CCD5ae")) +
+  scale_y_continuous(labels = scales::dollar_format(), limits = c(0, 1250)) +
+  ggtitle("Amount in Inflation Reduction Act (IRA) Tax Credits Claimed (in thousands)          ") +
+  labs(subtitle = "by Household Income Level (2023)          ") +
+  theme(plot.background = element_rect(fill = "#f9f2eb", color = NA),
+        panel.background = element_rect(fill = "#f9f2eb", color = NA),
+        panel.grid.major = element_line(color = "light gray"),
+        panel.grid.minor = element_line(color = "light gray"),
+        plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(size = 14, face = "italic", hjust = 0.5),
+        axis.title = element_blank(),
+        axis.text.x = element_text(color = "black", size = 7, vjust = 0.5, hjust = 0.5),
+        axis.text.y = element_text(size = 11, color = "black", hjust = 1),
+        axis.ticks = element_blank(),
+        legend.position = "top",
+        legend.background = element_rect(fill = "#f9f2eb"),
+        legend.title = element_blank(),
+        text = element_text(family = "serif", size = 13))
+
+```
+
+
+```{r energy burden by income category}
+
+acs22_energy_burden <- read_csv("acs2022_energy_costs.csv.gz")
+FIPS_Codes <- read_csv("FIPS Codes.csv") %>%
+  rename("STATEFIP" = "FIPS")
+
+acs22_energy_burden_sub <- acs22_energy_burden %>%
+  filter(HHINCOME != 9999999)
+
+acs22_energy_burden_sub$COSTGAS <- replace(acs22_energy_burden_sub$COSTGAS, acs22_energy_burden_sub$COSTGAS == 9992, 0)
+acs22_energy_burden_sub$COSTGAS <- replace(acs22_energy_burden_sub$COSTGAS, acs22_energy_burden_sub$COSTGAS == 9993, 0)
+acs22_energy_burden_sub$COSTGAS <- replace(acs22_energy_burden_sub$COSTGAS, acs22_energy_burden_sub$COSTGAS == 9997, 0)
+
+acs22_energy_burden_sub$COSTELEC <- replace(acs22_energy_burden_sub$COSTELEC, acs22_energy_burden_sub$COSTELEC == 9993, 0)
+acs22_energy_burden_sub$COSTELEC <- replace(acs22_energy_burden_sub$COSTELEC, acs22_energy_burden_sub$COSTELEC == 9997, 0)
+
+acs22_energy_burden_sub$COSTFUEL <- replace(acs22_energy_burden_sub$COSTFUEL, acs22_energy_burden_sub$COSTFUEL == 9993, 0)
+acs22_energy_burden_sub$COSTFUEL <- replace(acs22_energy_burden_sub$COSTFUEL, acs22_energy_burden_sub$COSTFUEL == 9997, 0)
+  
+acs22_energy_burden_sub <- acs22_energy_burden_sub %>%
+  filter(PERNUM == 1)
+
+acs22_energy_burden_sub <- acs22_energy_burden_sub %>%
+  select(HHWT, PERWT, COSTELEC, COSTGAS, COSTFUEL, HHINCOME, STATEFIP)
+
+acs22_energy_burden_sub <- left_join(acs22_energy_burden_sub, FIPS_Codes)
+
+acs22_energy_burden_sub <- acs22_energy_burden_sub %>%
+  mutate(Income_Cat = case_when(HHINCOME < 25000 ~ "Under $25,000",
+                                HHINCOME >= 25000 & HHINCOME < 50000 ~ "$25,000 - $50,000",
+                                HHINCOME >= 50000 & HHINCOME < 75000 ~ "$50,000 - $75,000",
+                                HHINCOME >= 75000 & HHINCOME < 100000 ~ "$75,000 - $100,000",
+                                HHINCOME >= 100000 & HHINCOME < 200000 ~ "$100,000 - $200,000",
+                                HHINCOME >= 200000 & HHINCOME < 500000 ~ "$200,000 - $500,000",
+                                HHINCOME >= 500000 & HHINCOME < 1000000 ~ "$500,000 - $1,000,000",
+                                HHINCOME > 1000000 ~ "Above $1,000,000"))
+
+energy_burden_income_cat <- acs22_energy_burden_sub %>%
+  group_by(Income_Cat) %>%
+  summarize(HHINCOME_med = weighted.mean(HHINCOME, w = HHWT),
+            COSTELEC_avg = weighted.mean(COSTELEC, w = HHWT),
+            COSTGAS_avg = weighted.mean(COSTGAS, w = HHWT),
+            COSTFUEL_avg = weighted.mean(COSTFUEL, w = HHWT)) %>%
+  mutate(energy_costs = COSTELEC_avg + COSTGAS_avg + COSTFUEL_avg) %>%
+  mutate(energy_burden = energy_costs / HHINCOME_med) %>%
+  select(Income_Cat, energy_burden)
+
+energy_burden_income_cat <- na.omit(energy_burden_income_cat)
+
+energy_burden_income_cat$Income_Cat <- factor(energy_burden_income_cat$Income_Cat, levels = c("Under $25,000",
+                                                          "$25,000 - $50,000",
+                                                          "$50,000 - $75,000",
+                                                          "$75,000 - $100,000",
+                                                          "$100,000 - $200,000",
+                                                          "$200,000 - $500,000",
+                                                          "$500,000 - $1,000,000",
+                                                          "Above $1,000,000"))
+
+energy_burden_income_cat_graph <- energy_burden_income_cat[order(energy_burden_income_cat$Income_Cat),]
+energy_burden_income_cat_graph$labels <- paste0(round(energy_burden_income_cat_graph$energy_burden*100, 1), "%")
+
+bar_graph_2 <- energy_burden_income_cat_graph %>%
+  ggplot(aes(x = Income_Cat, y = energy_burden, fill = "#CCD5ae")) +
+  geom_bar(position = "dodge", stat = "identity", color = "black") +
+  geom_text(aes(label = labels), size = 3, vjust = -0.5, fontface = "bold") +
+  scale_fill_manual(values = "#CCD5ae") +
+  scale_y_continuous(limits = c(0, 0.17)) +
+  labs(caption = "So far, households with severely high energy burdens are not claiming tax credits at\nthe same level as households making over $100,000 a year.") +
+  xlab("\nEstimated Energy Burden by Income Level") +
+  theme(plot.background = element_rect(fill = "#f9f2eb", color = NA),
+        plot.margin = margin(0.25, 0.25, 0.25, 0.6, "cm"),
+        panel.background = element_rect(fill = "#f9f2eb", color = NA),
+        panel.grid.major = element_line(color = "light gray"),
+        panel.grid.minor = element_line(color = "light gray"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(size = 13, face = "italic", hjust = 0.5),
+        plot.caption = element_text(size = 14, face = "italic", hjust = 0.5),
+        axis.title.x = element_text(face = "bold", size = 15),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_text(size = 11, color = "black", hjust = 1),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        text = element_text(family = "serif", size = 13))
+
+```
+
+
+```{r IRA tax credit amount by state}
+
+IRA_credit_amount_by_state <- read.csv("IRA Tax Credit Amount by State.csv")
+IRA_credit_amount_by_state$Abbr <- str_trim(IRA_credit_amount_by_state$Abbr, "left")
+IRA_credit_amount_by_state$Labels <- paste0(IRA_credit_amount_by_state$Abbr, "\n", "$", prettyNum(round(IRA_credit_amount_by_state$Amount/1000), big.mark = ","), "K")
+
+# coding help from https://r-graph-gallery.com/328-hexbin-map-of-the-usa.html
+
+my_sf <- read_sf("us_states_hexgrid.geojson")
+
+# Bit of reformatting
+my_sf <- my_sf %>%
+  mutate(google_name = gsub(" \\(United States\\)", "", google_name))
+
+# Merge geospatial and numerical information
+IRA_credit_amount_by_state_mapping <- my_sf %>%
+  left_join(IRA_credit_amount_by_state, by = c("iso3166_2" = "Abbr"))
+
+# plot
+map_1 <- ggplot(IRA_credit_amount_by_state_mapping) +
+  geom_sf(aes(fill = `Amount`), linewidth = 0.5) +
+  geom_sf_text(aes(label = Labels), fontface = "bold", color = "black", size = 2.9) +
+  theme_void() +
+  scale_fill_gradient(low = "#F0F4BF", high = "#fec868", labels = scales::dollar_format()) +
+  scale_x_continuous(expand = c(0,0)) +
+  ggtitle("\nAmount Claimed in IRA Credits by State (2023)") +
+  labs(subtitle = "Energy Efficient Home Improvements Tax Credit (25C) and\nResidential Clean Energy Credit (25D)") +
+  theme(plot.background = element_rect("#f9f2eb", color = NA),
+        plot.margin = margin(0.01, 0.25, 0.01, 0.25, "cm"),
+        panel.background = element_rect("#f9f2eb", color = NA),
+        legend.background = element_rect("#f9f2eb", color = NA),
+        plot.title = element_text(size = 18, hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(size = 14, hjust = 0.5, face = "italic"),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10),
+        legend.position = "right",
+        text = element_text(family = "serif"))
+
+```
+
+
+```{r low income energy burden by state}
+
+energy_burden_by_state <- read.csv("LEAD Tool Data States (Aug 14, 2024 9_13pm).csv")
+energy_burden_by_state$Abbr <- str_trim(energy_burden_by_state$Abbr, "left")
+energy_burden_by_state$Labels <- paste0(energy_burden_by_state$Abbr, "\n",energy_burden_by_state$Energy_Burden*100, "%")
+
+energy_burden_by_state_mapping <- my_sf %>%
+  left_join(energy_burden_by_state, by = c("iso3166_2" = "Abbr"))
+
+map_2 <- ggplot(energy_burden_by_state_mapping) +
+  geom_sf(aes(fill = Energy_Burden), linewidth = 0.5) +
+  geom_sf_text(aes(label = Labels), fontface = "bold", color = "black", size = 3) +
+  theme_void() +
+  scale_fill_gradient(low = "#F0F4BF", high = "#fec868") +
+  scale_x_continuous(expand = c(0,0)) +
+  ggtitle("\nAverage Energy Burden:\nHouseholds Making 80% AMI or Below") +
+  labs(subtitle = "Energy burdens are defined as the percent of income that go toward\nenergy costs. The states with the highest burdens are not necessarily\nthe states claiming the most in IRA credits.") +
+  theme(plot.background = element_rect("#f9f2eb", color = NA),
+        plot.margin = margin(0.01, 0.25, 0.01, 0.25, "cm"),
+        panel.background = element_rect("#f9f2eb", color = NA),
+        legend.background = element_rect("#f9f2eb", color = NA),
+        plot.title = element_text(size = 18, hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(size = 12, hjust = 0.5, face = "italic"),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10),
+        legend.position = "right",
+        text = element_text(family = "serif"))
+
+```
+
+```{r save bar plots}
+
+combined_graphs <- grid.arrange(bar_graph_1, bar_graph_2, ncol = 1, heights = c(0.65, 0.35),
+bottom = textGrob("\nSource: US Department of the Treasury, Author's Analysis of ACS 5-Year Survey (2018-2023) | github: julia-tache          ",
+gp = gpar(fontsize = 11, fontfamily = "serif"), hjust = 1, x = 1))
+
+cowplot::ggdraw(combined_graphs) +
+  theme(plot.background = element_rect(fill = "#f9f2eb", color = NA))
+
+ggsave("bar_graphs.png", height = 7, width = 8)
+
+```
+
+
+```{r save maps}
+
+combined_maps <- grid.arrange(map_1, map_2, ncol = 1,
+                              bottom = textGrob("Source: US Department of the Treasury, US Department of Energy LEAD Tool | github: julia-tache          ",
+                                                gp = gpar(fontsize = 11, fontfamily = "serif"),
+                                                hjust = 1,
+                                                x = 1))
+
+cowplot::ggdraw(combined_maps) +
+  theme(plot.background = element_rect(fill = "#f9f2eb", color = NA))
+
+ggsave("EV_maps.png", height = 9.5, width = 7)
+
+```
+
